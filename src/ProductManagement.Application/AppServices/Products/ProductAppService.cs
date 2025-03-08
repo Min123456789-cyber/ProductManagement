@@ -7,6 +7,7 @@ using ProductManagement.Entities.Products;
 using ProductManagement.Products;
 using ProductManagement.Responses;
 using System;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
@@ -94,7 +95,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
     }
 
-    public async Task<ResponseDataDto<object>> UpdateAsync(Guid id, CreateUpdateProductDto input)
+    public async Task<ResponseDataDto<object>> UpdateAsync([Required(ErrorMessage = "Id is required.")] Guid id, CreateUpdateProductDto input)
     {
         try
         {
@@ -129,7 +130,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
     }
 
-    public async Task<ResponseDataDto<object>> DeleteAsync(Guid id)
+    public async Task<ResponseDataDto<object>> DeleteAsync([Required(ErrorMessage = "Id is required.")] Guid id)
     {
         try
         {
@@ -160,7 +161,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
     }
 
-    public async Task<ResponseDataDto<object>> GetAsync(Guid id)
+    public async Task<ResponseDataDto<ProductDto>> GetAsync([Required(ErrorMessage = "Id is required.")] Guid id)
     {
         try
         {
@@ -187,7 +188,7 @@ public class ProductAppService : ApplicationService, IProductAppService
 
             _logger.LogInformation("Product retrieved successfully with ID: {ProductId}", id);
 
-            return new ResponseDataDto<object>
+            return new ResponseDataDto<ProductDto>
             {
                 Success = true,
                 Code = 200,
