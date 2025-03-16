@@ -1,7 +1,7 @@
 ﻿using AutoMapper;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
+using ProductManagement.Dtos;
 using ProductManagement.Entities.Category;
 using ProductManagement.Entities.Products;
 using ProductManagement.Products;
@@ -50,12 +50,6 @@ public class ProductAppService : ApplicationService, IProductAppService
 
             var product = _mapper.Map<CreateUpdateProductDto, Product>(input);
             await _productRepository.InsertAsync(product);
-
-            await _localEventBus.PublishAsync(new ProductCreatedEvent
-            {
-                ProductId = product.Id,
-                ProductName = product.Name
-            });
 
             _logger.LogInformation("Product created successfully with ID: {ProductId}", product.Id);
 
@@ -108,6 +102,20 @@ public class ProductAppService : ApplicationService, IProductAppService
             _logger.LogInformation("Product updated successfully with ID: {ProductId}", id);
 
             var result = _mapper.Map<Product, ProductDto>(product);
+
+            // Publish ProductPriceChanged event
+            await _localEventBus.PublishAsync(new ProductPriceChangedEvent
+            {
+                ProductId = result.Id,
+                NewPrice = result.Price
+            });
+
+            // Publish ProductStockChanged event
+            await _localEventBus.PublishAsync(new ProductStockChangedEvent
+            {
+                ProductId = result.Id,
+                NewStockQuantity = result.StockQuantity
+            });
 
             return new ResponseDataDto<object>
             {
@@ -274,4 +282,37 @@ public class ProductAppService : ApplicationService, IProductAppService
             throw new UserFriendlyException("An error occurred while retrieving the products.", "500");
         }
     }
+    
+    public async Task<ResponseDataDto<DropDownDto[]>> GetCategoriesAsync()
+    {
+        try
+        {
+            _logger.LogInformation("ProductAppService - GetCategoriesAsync: Started");
+
+            var categories = await _categoryRepository.GetQueryableAsync();
+
+            var result = await AsyncExecuter.ToArrayAsync(
+                categories
+                .Select(x => new DropDownDto
+                {
+                    Value = x.Id.ToString(),
+                    Name = x.Name 
+                }).OrderBy(x => x.Name)
+            );
+
+            return new ResponseDataDto<DropDownDto[]>
+            {
+                Code = 200,
+                Success = true,
+                Message = "Data retrieved successfully.",
+                Data = result
+            };
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError(ex, "An error occurred while retrieving products: {Message}", ex.Message);
+            throw new UserFriendlyException("An error occurred while retrieving the products.", "500");
+        }
+    }
 }
+
