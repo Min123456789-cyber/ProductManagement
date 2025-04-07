@@ -1,4 +1,6 @@
-﻿using ProductManagement.Dtos;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using ProductManagement.Dtos;
 using ProductManagement.Responses;
 using System;
 using System.Threading.Tasks;
@@ -14,5 +16,6 @@ public interface IProductAppService : IApplicationService
     Task<ResponseDataDto<object>> DeleteAsync(Guid id);
     Task<ResponseDataDto<ProductDto>> GetAsync(Guid id);
     Task<ResponseDataDto<PagedResultDto<ProductDto>>> GetListAsync(PagedAndSortedResultRequestDto input, ProductFilter filter);
-    Task<ResponseDataDto<DropDownDto[]>> GetCategoriesAsync(); 
+    Task<ResponseDataDto<DropDownDto[]>> GetCategoriesAsync();
+    Task<IActionResult> DownloadImageAsync(Guid id);
 }

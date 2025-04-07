@@ -98,7 +98,7 @@ public class ProductManagementDbContext :
 
             entity.Property(p => p.Price).HasColumnType("decimal(18,2)").IsRequired(true);
 
-            entity.Property(p => p.ImageUrl).HasMaxLength(500).IsRequired(true);
+            entity.Property(p => p.ImageUrl).HasMaxLength(500).IsRequired(false);
 
             entity.Property(p => p.StockQuantity).IsRequired(true);
 
