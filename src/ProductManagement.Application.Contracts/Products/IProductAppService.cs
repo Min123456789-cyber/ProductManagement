@@ -18,4 +18,5 @@ public interface IProductAppService : IApplicationService
     Task<ResponseDataDto<PagedResultDto<ProductDto>>> GetListAsync(PagedAndSortedResultRequestDto input, ProductFilter filter);
     Task<ResponseDataDto<DropDownDto[]>> GetCategoriesAsync();
     Task<IActionResult> DownloadImageAsync(Guid id);
+    Task<ResponseDataDto<object>> ClearProductCacheAsync();
 }

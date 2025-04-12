@@ -3,8 +3,10 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using ProductManagement.Constants;
 using ProductManagement.Dtos;
 using ProductManagement.Entities.Category;
 using ProductManagement.Entities.Products;
@@ -17,6 +19,7 @@ using System.IO;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
@@ -27,10 +30,6 @@ using Volo.Abp.EventBus.Local;
 
 namespace ProductManagement.AppServices.Products;
 
-/// <summary>
-/// Application service for managing products in the system.
-/// Handles CRUD operations, file uploads, and product-related business logic.
-/// </summary>
 public class ProductAppService : ApplicationService, IProductAppService
 {
     private readonly IRepository<Product, Guid> _productRepository;
@@ -41,11 +40,11 @@ public class ProductAppService : ApplicationService, IProductAppService
     private readonly IWebHostEnvironment _hostingEnvironment;
     private readonly IConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IDistributedCache _cache;
+    private readonly string _cacheKeyPrefix;
+    private readonly TimeSpan _cacheExpiration;
 
     #region Constructor
-    /// <summary>
-    /// Initializes a new instance of the ProductAppService with required dependencies.
-    /// </summary>
     public ProductAppService(
         IRepository<Product, Guid> productRepository,
         IMapper mapper,
@@ -54,7 +53,8 @@ public class ProductAppService : ApplicationService, IProductAppService
         ILocalEventBus localEventBus,
         IWebHostEnvironment hostingEnvironment,
         IConfiguration configuration,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IDistributedCache cache)
     {
         _productRepository = productRepository;
         _mapper = mapper;
@@ -64,6 +64,12 @@ public class ProductAppService : ApplicationService, IProductAppService
         _hostingEnvironment = hostingEnvironment;
         _configuration = configuration;
         _httpClientFactory = httpClientFactory;
+        _cache = cache;
+        
+        // Initialize cache settings from configuration
+        _cacheKeyPrefix = _configuration["Cache:ProductList:KeyPrefix"] ?? "Products:";
+        var expirationMinutes = _configuration.GetValue<int>("Cache:ProductList:ExpirationMinutes", 10);
+        _cacheExpiration = TimeSpan.FromMinutes(expirationMinutes);
     }
     #endregion
 
@@ -93,6 +99,9 @@ public class ProductAppService : ApplicationService, IProductAppService
 
             await _productRepository.InsertAsync(product);
             _logger.LogInformation("Product created successfully with ID: {ProductId}", product.Id);
+
+            // Invalidate cache after creating new product
+            await InvalidateProductListCacheAsync();
 
             var query = _mapper.Map<Product, ProductDto>(product);
             var category = await _categoryRepository.FirstOrDefaultAsync(x => x.Id == query.CategoryId);
@@ -157,6 +166,9 @@ public class ProductAppService : ApplicationService, IProductAppService
             await _productRepository.UpdateAsync(product);
             _logger.LogInformation("Product updated successfully with ID: {ProductId}", id);
 
+            // Invalidate cache after updating product
+            await InvalidateProductListCacheAsync();
+
             var result = _mapper.Map<Product, ProductDto>(product);
 
             _logger.LogDebug("Publishing product update events for ID: {ProductId}", id);
@@ -209,6 +221,9 @@ public class ProductAppService : ApplicationService, IProductAppService
 
             await _productRepository.DeleteAsync(id);
 
+            // Invalidate cache after deleting product
+            await InvalidateProductListCacheAsync();
+
             _logger.LogInformation("Product deleted successfully with ID: {ProductId}", id);
 
             return new ResponseDataDto<object>
@@ -245,7 +260,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         {
             _logger.LogInformation("Starting product retrieval process for ID: {ProductId}", id);
 
-            var product = await _productRepository.GetAsync(id);
+            var product = await _productRepository.FindAsync(id);
 
             var products = await _productRepository.GetQueryableAsync();
             var categories = await _categoryRepository.GetQueryableAsync();
@@ -307,6 +322,17 @@ public class ProductAppService : ApplicationService, IProductAppService
             }
             filter.SearchKeyword = filter.SearchKeyword?.Trim()?.ToLower();
 
+            // Generate cache key based on input parameters
+            var cacheKey = $"{_cacheKeyPrefix}{input.SkipCount}:{input.MaxResultCount}:{input.Sorting}:{filter.SearchKeyword}";
+            
+            // Try to get from cache first
+            var cachedResult = await _cache.GetStringAsync(cacheKey);
+            if (!string.IsNullOrWhiteSpace(cachedResult))
+            {
+                _logger.LogInformation("Retrieved product list from cache with key: {CacheKey}", cacheKey);
+                return JsonSerializer.Deserialize<ResponseDataDto<PagedResultDto<ProductDto>>>(cachedResult);
+            }
+
             var products = await _productRepository.GetQueryableAsync();
             var categories = await _categoryRepository.GetQueryableAsync();
 
@@ -341,13 +367,30 @@ public class ProductAppService : ApplicationService, IProductAppService
             _logger.LogInformation("Retrieved {Count} products out of {TotalCount} total", items.Count, totalCount);
 
             var result = new PagedResultDto<ProductDto>(totalCount, items);
-            return new ResponseDataDto<PagedResultDto<ProductDto>>
+            var response = new ResponseDataDto<PagedResultDto<ProductDto>>
             {
                 Success = true,
                 Code = 200,
                 Message = "Products retrieved successfully.",
                 Data = result
             };
+
+            // Cache the result
+            var cacheOptions = new DistributedCacheEntryOptions()
+                .SetAbsoluteExpiration(_cacheExpiration);
+            
+            await _cache.SetStringAsync(
+                cacheKey,
+                JsonSerializer.Serialize(response),
+                cacheOptions
+            );
+
+            // Add the cache key to active keys
+            await AddActiveCacheKeyAsync(cacheKey);
+
+            _logger.LogInformation("Cached product list with key: {CacheKey}", cacheKey);
+
+            return response;
         }
         catch (UserFriendlyException ex)
         {
@@ -420,7 +463,7 @@ public class ProductAppService : ApplicationService, IProductAppService
             }
 
             var imageUrl = product.ImageUrl;
-            var baseUrl = _configuration["Product:BaseUrl"];
+            var baseUrl = _configuration["App:BaseUrl"];
             if (!Uri.IsWellFormedUriString(imageUrl, UriKind.Absolute))
             {
                 imageUrl = new Uri(new Uri(baseUrl), imageUrl).ToString();
@@ -462,9 +505,136 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
     }
 
+    /// <summary>
+    /// Clears all product-related cache entries.
+    /// </summary>
+    /// <returns>A response indicating the success of the cache clearing operation.</returns>
+    public async Task<ResponseDataDto<object>> ClearProductCacheAsync()
+    {
+        try
+        {
+            _logger.LogInformation("Starting product cache clearing process");
+
+            // Get all keys matching the product list prefix
+            var cacheKeys = await GetProductListCacheKeysAsync();
+            var clearedKeys = new List<string>();
+            
+            // Remove each cache entry
+            foreach (var key in cacheKeys)
+            {
+                await _cache.RemoveAsync(key);
+                clearedKeys.Add(key);
+                _logger.LogInformation("Cleared cache key: {CacheKey}", key);
+            }
+
+            // Also clear the active keys list
+            var activeKeysKey = $"{_cacheKeyPrefix}ActiveKeys";
+            await _cache.RemoveAsync(activeKeysKey);
+            _logger.LogInformation("Cleared active keys list");
+
+            return new ResponseDataDto<object>
+            {
+                Success = true,
+                Code = 200,
+                Message = $"Successfully cleared {clearedKeys.Count} cache entries.",
+                Data = new
+                {
+                    ClearedKeys = clearedKeys,
+                    ClearedCount = clearedKeys.Count
+                }
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to clear product cache. Error: {ErrorMessage}", ex.Message);
+            throw new UserFriendlyException("An error occurred while clearing the product cache.", "500");
+        }
+    }
+
     #endregion
 
     #region Private Methods
+
+    /// <summary>
+    /// Invalidates all product list cache entries
+    /// </summary>
+    private async Task InvalidateProductListCacheAsync()
+    {
+        try
+        {
+            // Get all keys matching the product list prefix
+            var cacheKeys = await GetProductListCacheKeysAsync();
+            
+            // Remove each cache entry
+            foreach (var key in cacheKeys)
+            {
+                await _cache.RemoveAsync(key);
+                _logger.LogInformation("Invalidated cache key: {CacheKey}", key);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while invalidating product list cache");
+        }
+    }
+
+    /// <summary>
+    /// Gets all cache keys that match the product list prefix
+    /// </summary>
+    private async Task<IEnumerable<string>> GetProductListCacheKeysAsync()
+    {
+        try
+        {
+            // Since Redis doesn't provide a direct way to get all keys with a pattern,
+            // we'll use a workaround by storing a list of active cache keys
+            var activeKeysKey = $"{_cacheKeyPrefix}ActiveKeys";
+            var activeKeysJson = await _cache.GetStringAsync(activeKeysKey);
+            
+            if (string.IsNullOrEmpty(activeKeysJson))
+            {
+                return Enumerable.Empty<string>();
+            }
+
+            return JsonSerializer.Deserialize<List<string>>(activeKeysJson) ?? Enumerable.Empty<string>();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while getting product list cache keys");
+            return Enumerable.Empty<string>();
+        }
+    }
+
+    /// <summary>
+    /// Adds a cache key to the list of active keys
+    /// </summary>
+    private async Task AddActiveCacheKeyAsync(string cacheKey)
+    {
+        try
+        {
+            var activeKeysKey = $"{_cacheKeyPrefix}ActiveKeys";
+            var activeKeysJson = await _cache.GetStringAsync(activeKeysKey);
+            var activeKeys = new List<string>();
+
+            if (!string.IsNullOrEmpty(activeKeysJson))
+            {
+                activeKeys = JsonSerializer.Deserialize<List<string>>(activeKeysJson) ?? new List<string>();
+            }
+
+            if (!activeKeys.Contains(cacheKey))
+            {
+                activeKeys.Add(cacheKey);
+                await _cache.SetStringAsync(
+                    activeKeysKey,
+                    JsonSerializer.Serialize(activeKeys),
+                    new DistributedCacheEntryOptions().SetAbsoluteExpiration(_cacheExpiration)
+                );
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while adding active cache key: {CacheKey}", cacheKey);
+        }
+    }
 
     /// <summary>
     /// Validates and uploads a file, returning the file path.
