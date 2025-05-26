@@ -267,6 +267,7 @@ public class ProductAppService : ApplicationService, IProductAppService
 
             var result = await (from p in products
                                 join c in categories on p.CategoryId equals c.Id
+                                where p.Id == id
                                 select new ProductDto
                                 {
                                     Id = p.Id,
