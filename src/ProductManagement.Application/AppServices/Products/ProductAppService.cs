@@ -1,9 +1,11 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
 using ProductManagement.Entities.Category;
 using ProductManagement.Entities.Products;
+using ProductManagement.Permissions;
 using ProductManagement.Products;
 using ProductManagement.Responses;
 using System;
@@ -18,7 +20,7 @@ using Volo.Abp.EventBus;
 using Volo.Abp.EventBus.Local;
 
 namespace ProductManagement.AppServices.Products;
-
+[Authorize]
 public class ProductAppService : ApplicationService, IProductAppService
 {
     private readonly IRepository<Product, Guid> _productRepository;
@@ -41,6 +43,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         _localEventBus = localEventBus;
     }
 
+    [Authorize(ProductManagementPermissions.Category.Create)]
     public async Task<ResponseDataDto<object>> CreateAsync(CreateUpdateProductDto input)
     {
         try
@@ -94,6 +97,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
     }
 
+    [Authorize(ProductManagementPermissions.Category.Edit)]
     public async Task<ResponseDataDto<object>> UpdateAsync(Guid id, CreateUpdateProductDto input)
     {
         try
@@ -129,6 +133,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
     }
 
+    [Authorize(ProductManagementPermissions.Category.Delete)]
     public async Task<ResponseDataDto<object>> DeleteAsync(Guid id)
     {
         try
@@ -160,6 +165,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
     }
 
+    [Authorize(ProductManagementPermissions.Category.Default)]
     public async Task<ResponseDataDto<object>> GetAsync(Guid id)
     {
         try
@@ -208,6 +214,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
     }
 
+    [Authorize(ProductManagementPermissions.Category.Default)]
     public async Task<ResponseDataDto<PagedResultDto<ProductDto>>> GetListAsync(PagedAndSortedResultRequestDto input, ProductFilter filter)
     {
         try

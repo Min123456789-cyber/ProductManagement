@@ -1,4 +1,5 @@
 using AutoMapper;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Logging;
 using ProductManagement.Categories;
 using ProductManagement.Entities.Category;
@@ -25,6 +26,7 @@ public class CategoryAppService : ApplicationService, ICategoryAppService
         _mapper = mapper;
     }
 
+    [Authorize]
     public async Task<ResponseDataDto<object>> CreateAsync(CreateUpdateCategoryDto input)
     {
         try

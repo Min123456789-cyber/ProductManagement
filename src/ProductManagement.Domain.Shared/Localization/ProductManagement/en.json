@@ -4,6 +4,18 @@
     "AppName": "ProductManagement",
     "Menu:Home": "Home",
     "Welcome": "Welcome",
-    "LongWelcomeMessage": "Welcome to the application. This is a startup project based on the ABP framework. For more information, visit abp.io."
+    "LongWelcomeMessage": "Welcome to the application. This is a startup project based on the ABP framework. For more information, visit abp.io.",
+
+    "Permission:Products": "Products",
+    "Permission:Products.Create": "Create",
+    "Permission:Products.Edit": "Edit",
+    "Permission:Products.Delete": "Delete",
+    "Permission:Products.View": "View",
+
+    "Permission:Categories": "Categories",
+    "Permission:Categories.Create": "Create",
+    "Permission:Categories.Edit": "Edit",
+    "Permission:Categories.Delete": "Delete",
+    "Permission:Categories.View": "View"
   }
 }
