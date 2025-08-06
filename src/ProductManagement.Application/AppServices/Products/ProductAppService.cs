@@ -1,8 +1,8 @@
 ﻿using AutoMapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Logging;
+using ProductManagement.Constants;
 using ProductManagement.Entities.Category;
 using ProductManagement.Entities.Products;
 using ProductManagement.Permissions;
@@ -16,7 +16,6 @@ using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
-using Volo.Abp.EventBus;
 using Volo.Abp.EventBus.Local;
 
 namespace ProductManagement.AppServices.Products;
@@ -214,7 +213,8 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
     }
 
-    [Authorize(ProductManagementPermissions.Category.Default)]
+    //[Authorize(ProductManagementPermissions.Category.Default)]
+    [Authorize(CustomAuthentication.ApiKeyOrBearerTokenPolicy)]
     public async Task<ResponseDataDto<PagedResultDto<ProductDto>>> GetListAsync(PagedAndSortedResultRequestDto input, ProductFilter filter)
     {
         try

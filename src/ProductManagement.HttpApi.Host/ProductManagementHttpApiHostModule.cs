@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using Medallion.Threading;
 using Medallion.Threading.Redis;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -12,10 +8,17 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.OpenApi.Models;
+using ProductManagement.ApiKeyAuthentication;
+using ProductManagement.Constants;
 using ProductManagement.EntityFrameworkCore;
 using ProductManagement.MultiTenancy;
+using ProductManagement.Options;
 using StackExchange.Redis;
-using Microsoft.OpenApi.Models;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using Volo.Abp;
 using Volo.Abp.AspNetCore.Authentication.JwtBearer;
 using Volo.Abp.AspNetCore.Mvc;
@@ -25,8 +28,6 @@ using Volo.Abp.Autofac;
 using Volo.Abp.Caching;
 using Volo.Abp.Caching.StackExchangeRedis;
 using Volo.Abp.DistributedLocking;
-using Volo.Abp.Identity;
-using Volo.Abp.Localization;
 using Volo.Abp.Modularity;
 using Volo.Abp.Security.Claims;
 using Volo.Abp.Swashbuckle;
@@ -62,6 +63,7 @@ public class ProductManagementHttpApiHostModule : AbpModule
         ConfigureCors(context, configuration);
         ConfigureSwaggerServices(context, configuration);
     }
+
 
     private void ConfigureCache(IConfiguration configuration)
     {
@@ -102,6 +104,7 @@ public class ProductManagementHttpApiHostModule : AbpModule
 
     private void ConfigureAuthentication(ServiceConfigurationContext context, IConfiguration configuration)
     {
+        // First, configure JWT Bearer authentication
         context.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddAbpJwtBearer(options =>
             {
@@ -109,6 +112,28 @@ public class ProductManagementHttpApiHostModule : AbpModule
                 options.RequireHttpsMetadata = configuration.GetValue<bool>("AuthServer:RequireHttpsMetadata");
                 options.Audience = "ProductManagement";
             });
+
+        // Now, add API key authentication
+        var authBuilder = context.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme);
+
+        authBuilder.AddScheme<ApiKeyAuthenticationOptions, ApiKeyAuthenticationHandler>(
+            CustomAuthentication.ApiKeyScheme, // Using the constant ApiKeyScheme defined earlier
+            options =>
+            {
+                // Bind the ApiKey authentication settings from configuration
+                configuration.Bind("ApiKeyAuthentication", options);
+            });
+
+        context.Services.AddAuthorization(options =>
+        {
+
+            options.AddPolicy(CustomAuthentication.ApiKeyOrBearerTokenPolicy, policy =>
+            {
+                policy.AuthenticationSchemes.Add(CustomAuthentication.ApiKeyScheme);
+                policy.AuthenticationSchemes.Add(JwtBearerDefaults.AuthenticationScheme);
+                policy.RequireAuthenticatedUser();
+            });
+        });
 
         context.Services.Configure<AbpClaimsPrincipalFactoryOptions>(options =>
         {
@@ -181,27 +206,32 @@ public class ProductManagementHttpApiHostModule : AbpModule
         var app = context.GetApplicationBuilder();
         var env = context.GetEnvironment();
 
+        // Development environment-specific exception page
         if (env.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
         }
 
-        app.UseAbpRequestLocalization();
-        app.UseCorrelationId();
-        app.UseStaticFiles();
-        app.UseRouting();
-        app.UseCors();
-        app.UseAuthentication();
+        // Localization and other required middlewares
+        app.UseAbpRequestLocalization();  // Handles localization for the application
+        app.UseCorrelationId();           // Correlation ID for tracking requests
+        app.UseStaticFiles();             // Static file middleware for serving static files (CSS, JS, etc.)
+        app.UseRouting();                 // Enable routing for the application
+
+        app.UseCors();                    // Enable Cross-Origin Resource Sharing (CORS)
+
+        app.UseAuthentication();          // Ensure authentication happens before authorization
 
         if (MultiTenancyConsts.IsEnabled)
         {
-            app.UseMultiTenancy();
+            app.UseMultiTenancy();        // Use multi-tenancy if enabled
         }
 
-        app.UseUnitOfWork();
-        app.UseDynamicClaims();
-        app.UseAuthorization();
+        app.UseUnitOfWork();              // Ensure that the unit of work pattern is used in requests
+        app.UseDynamicClaims();           // Add dynamic claims (if you have dynamic claims set up)
+        app.UseAuthorization();           // Authorization happens after authentication
 
+        // Swagger for API documentation
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>
         {
@@ -212,8 +242,12 @@ public class ProductManagementHttpApiHostModule : AbpModule
             options.OAuthScopes("ProductManagement");
         });
 
+        // Auditing middleware for logging activities
         app.UseAuditing();
-        app.UseAbpSerilogEnrichers();
-        app.UseConfiguredEndpoints();
+        app.UseAbpSerilogEnrichers();  // Enrich logs with ABP and Serilog information
+
+        // Apply the configured endpoints for the app
+        app.UseConfiguredEndpoints();    // Ensures that the endpoints are properly configured for the app
     }
+
 }
