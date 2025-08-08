@@ -9,7 +9,6 @@ using System.Threading.Tasks;
 
 namespace ProductManagement.ApiKeyAuthentication
 {
-    // Ensure this inherits from AuthenticationHandler<ApiKeyAuthenticationOptions>
     public class ApiKeyAuthenticationHandler : AuthenticationHandler<ApiKeyAuthenticationOptions>
     {
         public ApiKeyAuthenticationHandler(
@@ -23,7 +22,6 @@ namespace ProductManagement.ApiKeyAuthentication
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            // Get the API key from the request header
             var apiKey = Request.Headers["x-api-key"].FirstOrDefault();
 
             if (string.IsNullOrEmpty(apiKey))
@@ -31,12 +29,11 @@ namespace ProductManagement.ApiKeyAuthentication
                 return Task.FromResult(AuthenticateResult.Fail("API key is missing."));
             }
 
-            // Compare the provided API key with the configured API key
-            if (apiKey == Options.ApiKey)  // Make sure the ApiKey in Options is set correctly
+            if (apiKey == Options.ApiKey)  
             {
                 var claims = new[]
                 {
-                    new Claim(ClaimTypes.Name, "ApiUser") // You can add more claims here
+                    new Claim(ClaimTypes.Name, "ApiUser") 
                 };
 
                 var identity = new ClaimsIdentity(claims, "ApiKey");
