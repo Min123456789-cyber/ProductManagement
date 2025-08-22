@@ -12,6 +12,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.OpenApi.Models;
 using ProductManagement.EntityFrameworkCore;
 using ProductManagement.MultiTenancy;
+using ProductManagement.RateLimiting;
 using StackExchange.Redis;
 using System;
 using System.Collections.Generic;
@@ -62,6 +63,7 @@ public class ProductManagementHttpApiHostModule : AbpModule
         ConfigureDistributedLocking(context, configuration);
         ConfigureCors(context, configuration);
         ConfigureSwaggerServices(context, configuration);
+        ConfigureRateLimiting(context.Services);
         
         // Configure file upload options
         context.Services.Configure<IISServerOptions>(options =>
@@ -191,6 +193,26 @@ public class ProductManagementHttpApiHostModule : AbpModule
         });
     }
 
+    private void ConfigureRateLimiting(IServiceCollection services)
+    {
+        services.AddRateLimiting(options =>
+        {
+            options.RequestsPerMinute = 5;
+            options.WhitelistedIPs.Add("127.0.0.1");
+            options.EnableExponentialBackoff = true;
+            options.BaseBackoffSeconds = 60;
+
+            // Configure different limits for different endpoints
+            options.EndpointLimits.Add("/api/product/create", 2); // More restrictive for create
+            options.EndpointLimits.Add("/api/product/update", 2); // More restrictive for update
+            options.EndpointLimits.Add("/api/product/delete", 1); // Most restrictive for delete
+
+            // Uncomment to use Redis for distributed rate limiting
+            // options.UseRedis = true;
+            // options.RedisConnectionString = "localhost:6379";
+        });
+    }
+
     public override void OnApplicationInitialization(ApplicationInitializationContext context)
     {
         var app = context.GetApplicationBuilder();
@@ -236,6 +258,7 @@ public class ProductManagementHttpApiHostModule : AbpModule
 
         app.UseAuditing();
         app.UseAbpSerilogEnrichers();
+        app.UseRateLimiting();
         app.UseConfiguredEndpoints();
     }
 }
