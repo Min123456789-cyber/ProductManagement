@@ -42,7 +42,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         _localEventBus = localEventBus;
     }
 
-    [Authorize(ProductManagementPermissions.Category.Create)]
+    [Authorize(ProductManagementPermissions.Category.Create)] // Why are you using category permission on product.
     public async Task<ResponseDataDto<object>> CreateAsync(CreateUpdateProductDto input)
     {
         try

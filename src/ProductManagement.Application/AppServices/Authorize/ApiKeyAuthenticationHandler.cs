@@ -24,7 +24,7 @@ namespace ProductManagement.ApiKeyAuthentication
         {
             var apiKey = Request.Headers["x-api-key"].FirstOrDefault();
 
-            if (string.IsNullOrEmpty(apiKey))
+            if (string.IsNullOrEmpty(apiKey))  //user IsNullOrWhiteSpace from MIN.
             {
                 return Task.FromResult(AuthenticateResult.Fail("API key is missing."));
             }
