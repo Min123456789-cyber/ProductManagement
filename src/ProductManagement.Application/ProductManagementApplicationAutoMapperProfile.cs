@@ -1,6 +1,8 @@
 ﻿using AutoMapper;
 using ProductManagement.Categories;
+using ProductManagement.Departments;
 using ProductManagement.Entities.Category;
+using ProductManagement.Entities.Departments;
 using ProductManagement.Entities.Products;
 using ProductManagement.Products;
 
@@ -15,5 +17,8 @@ public class ProductManagementApplicationAutoMapperProfile : Profile
 
         CreateMap<CreateUpdateProductDto, Product>();
         CreateMap<Product, ProductDto>();
+
+        CreateMap<CreateUpdateDepartment, Department>();
+        CreateMap<Department, DepartmentDto>();
     }
 }

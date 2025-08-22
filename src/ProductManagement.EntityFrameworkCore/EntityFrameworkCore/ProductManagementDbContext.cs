@@ -1,6 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using ProductManagement.Entities.Category;
+using ProductManagement.Entities.Departments;
 using ProductManagement.Entities.Products;
+using ProductManagement.Entities.Teachers;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
 using Volo.Abp.Data;
@@ -63,6 +65,9 @@ public class ProductManagementDbContext :
 
     public DbSet<Product> Products { get; set; }
     public DbSet<Category> Categories { get; set; }
+    public DbSet<Teacher> Teachers { get; set; }
+    public DbSet<Department> Departments { get; set; }
+    
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -103,6 +108,25 @@ public class ProductManagementDbContext :
             entity.Property(p => p.StockQuantity).IsRequired(true);
 
             entity.HasOne<Category>().WithMany().HasForeignKey(x => x.CategoryId).IsRequired(true);
+        });
+
+        builder.Entity<Teacher>(entity =>
+        {
+            entity.ToTable("Teachers");
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.FirstName).IsRequired(true).HasMaxLength(50);
+            entity.Property(p => p.MiddleName).HasMaxLength(50);
+            entity.Property(p => p.LastName).IsRequired(true).HasMaxLength(50);
+            entity.Property(p => p.Email).IsRequired(true).HasMaxLength(100);
+            entity.Property(p => p.Phone).IsRequired(true).HasMaxLength(20);
+            entity.HasOne<Department>().WithMany().HasForeignKey(x => x.DepartmentId).IsRequired(true);
+        });
+
+        builder.Entity<Department>(entity =>
+        {
+            entity.ToTable("Departments");
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.Name).IsRequired(true).HasMaxLength(100);
         });
     }
 }
