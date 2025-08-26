@@ -204,10 +204,25 @@ public class TeacherAppService : ITeacherAppService
                                   x.Email.ToLower().Contains(filter.SearchKeyword)
                         );
 
-            var dtos = await AsyncExecuter.ToListAsync(query
+            var dtos = await query
                 .OrderBy(input.Sorting)
                 .Skip(input.SkipCount)
-                .Take(input.MaxResultCount));
+                .Take(input.MaxResultCount)
+                .ToListAsync();
+
+            var totalCount = await query.CountAsync();
+
+            _logger.LogInformation("Teacher list retrieved successfully with {TotalCount} records.", totalCount);
+
+            var teacher = new PagedResultDto<TeacherDto>(totalCount, dtos);
+
+            return new ResponseDataDto<PagedResultDto<TeacherDto>>
+            {
+                Success = true,
+                Code = 200,
+                Message = "Teacher list retrieved successfully.",
+                Data = teacher
+            };
         }
         catch (Exception ex) when(!(ex is UserFriendlyException))
         {
@@ -216,6 +231,12 @@ public class TeacherAppService : ITeacherAppService
         }
     }
 
+    /// <summary>
+    /// Retrieves a specific teacher by ID.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <returns></returns>
+    /// <exception cref="UserFriendlyException"></exception>
     public async Task<ResponseDataDto<TeacherDto>> GetAsync([Required(ErrorMessage = "Id is required.")] Guid id)
     {
         try
