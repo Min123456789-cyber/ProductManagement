@@ -2,7 +2,7 @@
 
 namespace ProductManagement.Teachers;
 
-public class TeacherDto
+public record TeacherDto
 {
     public Guid Id { get; set; }
     public string FirstName { get; set; }

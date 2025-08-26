@@ -6,7 +6,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using ProductManagement.Constants;
 using ProductManagement.Dtos;
 using ProductManagement.Entities.Category;
 using ProductManagement.Entities.Products;
@@ -25,7 +24,6 @@ using Volo.Abp;
 using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
-using Volo.Abp.EventBus;
 using Volo.Abp.EventBus.Local;
 
 namespace ProductManagement.AppServices.Products;

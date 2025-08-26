@@ -13,4 +13,5 @@ public class ErrorConsts
     public const string StatusCheck = "Status is required.";
     public const string Invalid = "Invalid.";
     public const string Code = "Code should not exceed 5 characters";
+    public const string NotFound = "Not Found";
 }
