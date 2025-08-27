@@ -1,4 +1,5 @@
-﻿using ProductManagement.Responses;
+﻿using Microsoft.AspNetCore.Mvc;
+using ProductManagement.Responses;
 using System;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Dtos;
@@ -12,4 +13,5 @@ public interface ITeacherAppService
     Task<ResponseDataDto<TeacherResponseDto>> DeleteAsync(Guid id);
     Task<ResponseDataDto<PagedResultDto<TeacherDto>>> GetListAsync(PagedAndSortedResultRequestDto input, TeacherFilter filter);
     Task<ResponseDataDto<TeacherDto>> GetAsync(Guid id);
+    Task<IActionResult> ExportAsync(TeacherExportRequestDto request);
 }

@@ -1,10 +1,12 @@
 ﻿using AutoMapper;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 using ProductManagement.Constants;
 using ProductManagement.Entities.Departments;
 using ProductManagement.Entities.Teachers;
+using ProductManagement.Export;
+using ProductManagement.Export.Formatters;
 using ProductManagement.Responses;
 using ProductManagement.Teachers;
 using System;
@@ -15,12 +17,13 @@ using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
 using Volo.Abp;
 using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.Users;
 
 namespace ProductManagement.AppServices.Teachers;
 
-public class TeacherAppService : ITeacherAppService
+public class TeacherAppService : ApplicationService, ITeacherAppService
 {
     private readonly IRepository<Teacher, Guid> _teacherRepository;
     private readonly ILogger<TeacherAppService> _logger;
@@ -283,4 +286,29 @@ public class TeacherAppService : ITeacherAppService
             throw new UserFriendlyException(ErrorConsts.ServerError, "500");
         }
     }
+
+    /// <summary>
+    /// Exports teacher data in different formats (CSV, Excel, JSON, XML).
+    /// </summary>
+    /// <param name="request">Export request containing format and filter options.</param>
+    /// <returns>File result with exported data.</returns>
+    /// <exception cref="UserFriendlyException">Thrown when export fails.</exception>
+    public async Task<IActionResult> ExportAsync(TeacherExportRequestDto request)
+    {
+        // Convert to generic export request
+        var exportRequest = new ExportRequestDto<TeacherFilter>
+        {
+            Format = request.Format,
+            FileName = request.FileName,
+            IncludeHeaders = request.IncludeHeaders,
+            Filter = request.Filter,
+            EntityName = "teachers"
+        };
+
+        // Get the export service from DI
+        var exportService = LazyServiceProvider.LazyGetRequiredService<TeacherExportService>();
+        return await exportService.ExportAsync(exportRequest);
+    }
+
+
 }
