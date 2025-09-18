@@ -9,6 +9,7 @@ using ProductManagement.Permissions;
 using ProductManagement.Products;
 using ProductManagement.Responses;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Dynamic.Core;
 using System.Threading.Tasks;
@@ -280,4 +281,57 @@ public class ProductAppService : ApplicationService, IProductAppService
             throw new UserFriendlyException("An error occurred while retrieving the products.", "500");
         }
     }
+
+    public async Task<ResponseDataDto<ProductDetailsDto>> GetProductDetailAsync(Guid productId)
+    {
+        _logger.LogInformation("ProductAppService - GetListAsync: Started");
+
+        var categories = await _categoryRepository.GetQueryableAsync();
+        var products = await _productRepository.GetQueryableAsync();
+
+        var query = await (from p in products
+                     join c in categories on p.CategoryId equals c.Id
+                     where p.Id == productId
+                     select new ProductDetailsDto 
+                     {
+                         CategoryName = c.Name,
+                         ProductName = p.Name,
+                     }).FirstOrDefaultAsync();
+
+        return new ResponseDataDto<ProductDetailsDto>
+        {
+            Success = true,
+            Code = 200,
+            Message = "Products details retrieved successfully.",
+            Data = query
+        };
+    }
+
+    //When we put id of smallsized category then i should get the list of products which have categoryname small sized
+    public async Task<ResponseDataDto<List<ProductDetailsDto>>> GetProductDetailsAsync(Guid categoryId)
+    {
+        _logger.LogInformation("ProductAppService - GetListAsync: Started");
+
+        var categories = await _categoryRepository.GetQueryableAsync();
+        var products = await _productRepository.GetQueryableAsync();
+
+        var query = await (from p in products
+                           join c in categories on p.CategoryId equals c.Id
+                           where c.Id == categoryId 
+                           select new ProductDetailsDto
+                           {
+                               CategoryName = c.Name,
+                               ProductName = p.Name,
+                           }).ToListAsync(); 
+
+        return new ResponseDataDto<List<ProductDetailsDto>>
+        {
+            Success = true,
+            Code = 200,
+            Message = "Products details retrieved successfully.",
+            Data = query
+        };
+    }
+    // product ma category xa so from product gariyeko ho
+    //
 }

@@ -1,5 +1,6 @@
 ﻿using ProductManagement.Responses;
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Dtos;
 
@@ -12,4 +13,6 @@ public interface IProductAppService
     Task<ResponseDataDto<object>> DeleteAsync(Guid id);
     Task<ResponseDataDto<object>> GetAsync(Guid id);
     Task<ResponseDataDto<PagedResultDto<ProductDto>>> GetListAsync(PagedAndSortedResultRequestDto input, ProductFilter filter);
+    Task<ResponseDataDto<ProductDetailsDto>> GetProductDetailAsync(Guid ProductId);
+    Task<ResponseDataDto<List<ProductDetailsDto>>> GetProductDetailsAsync(Guid categoryId);
 }
