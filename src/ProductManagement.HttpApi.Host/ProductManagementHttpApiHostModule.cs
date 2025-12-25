@@ -5,14 +5,17 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.OpenApi.Models;
 using Microsoft.OpenApi.Models;
 using ProductManagement.ApiKeyAuthentication;
 using ProductManagement.Constants;
 using ProductManagement.EntityFrameworkCore;
 using ProductManagement.MultiTenancy;
+using ProductManagement.RateLimiting;
 using ProductManagement.Options;
 using StackExchange.Redis;
 using System;
@@ -54,6 +57,8 @@ public class ProductManagementHttpApiHostModule : AbpModule
         var configuration = context.Services.GetConfiguration();
         var hostingEnvironment = context.Services.GetHostingEnvironment();
 
+        context.Services.AddHttpClient();
+
         ConfigureConventionalControllers();
         ConfigureAuthentication(context, configuration);
         ConfigureCache(configuration);
@@ -62,6 +67,21 @@ public class ProductManagementHttpApiHostModule : AbpModule
         ConfigureDistributedLocking(context, configuration);
         ConfigureCors(context, configuration);
         ConfigureSwaggerServices(context, configuration);
+        ConfigureRateLimiting(context.Services);
+        
+        // Configure file upload options
+        context.Services.Configure<IISServerOptions>(options =>
+        {
+            options.MaxRequestBodySize = int.MaxValue; // or set a specific limit
+        });
+
+        context.Services.Configure<FormOptions>(options =>
+        {
+            options.ValueLengthLimit = int.MaxValue;
+            options.MultipartBodyLengthLimit = int.MaxValue;
+            options.MultipartHeadersLengthLimit = int.MaxValue;
+            options.BufferBody = true;
+        });
     }
 
 
@@ -201,12 +221,38 @@ public class ProductManagementHttpApiHostModule : AbpModule
         });
     }
 
+    private void ConfigureRateLimiting(IServiceCollection services)
+    {
+        services.AddRateLimiting(options =>
+        {
+            options.RequestsPerMinute = 5;
+            options.WhitelistedIPs.Add("127.0.0.1");
+            options.EnableExponentialBackoff = true;
+            options.BaseBackoffSeconds = 60;
+
+            // Configure different limits for different endpoints
+            options.EndpointLimits.Add("/api/product/create", 2); // More restrictive for create
+            options.EndpointLimits.Add("/api/product/update", 2); // More restrictive for update
+            options.EndpointLimits.Add("/api/product/delete", 1); // Most restrictive for delete
+
+            // Uncomment to use Redis for distributed rate limiting
+            // options.UseRedis = true;
+            // options.RedisConnectionString = "localhost:6379";
+        });
+    }
+
     public override void OnApplicationInitialization(ApplicationInitializationContext context)
     {
         var app = context.GetApplicationBuilder();
         var env = context.GetEnvironment();
 
-        // Development environment-specific exception page
+        // Configure request body size limit
+        app.Use(async (context, next) =>
+        {
+            context.Features.Get<IHttpMaxRequestBodySizeFeature>().MaxRequestBodySize = null;
+            await next.Invoke();
+        });
+
         if (env.IsDevelopment())
         {
             app.UseDeveloperExceptionPage();
@@ -244,10 +290,9 @@ public class ProductManagementHttpApiHostModule : AbpModule
 
         // Auditing middleware for logging activities
         app.UseAuditing();
-        app.UseAbpSerilogEnrichers();  // Enrich logs with ABP and Serilog information
-
-        // Apply the configured endpoints for the app
-        app.UseConfiguredEndpoints();    // Ensures that the endpoints are properly configured for the app
+        app.UseAbpSerilogEnrichers();
+        app.UseRateLimiting();
+        app.UseConfiguredEndpoints();
     }
 
 }

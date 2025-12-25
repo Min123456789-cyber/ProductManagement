@@ -1,18 +1,25 @@
-﻿using ProductManagement.Responses;
+﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using ProductManagement.Dtos;
+using ProductManagement.Responses;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Volo.Abp.Application.Dtos;
+using Volo.Abp.Application.Services;
 
 namespace ProductManagement.Products;
 
-public interface IProductAppService
+public interface IProductAppService : IApplicationService
 {
     Task<ResponseDataDto<object>> CreateAsync(CreateUpdateProductDto input);
     Task<ResponseDataDto<object>> UpdateAsync(Guid id, CreateUpdateProductDto input);
     Task<ResponseDataDto<object>> DeleteAsync(Guid id);
-    Task<ResponseDataDto<object>> GetAsync(Guid id);
+    Task<ResponseDataDto<ProductDto>> GetAsync(Guid id);
     Task<ResponseDataDto<PagedResultDto<ProductDto>>> GetListAsync(PagedAndSortedResultRequestDto input, ProductFilter filter);
+    Task<ResponseDataDto<DropDownDto[]>> GetCategoriesAsync();
+    Task<IActionResult> DownloadImageAsync(Guid id);
+    Task<ResponseDataDto<object>> ClearProductCacheAsync();
     Task<ResponseDataDto<ProductDetailsDto>> GetProductDetailAsync(Guid ProductId);
     Task<ResponseDataDto<List<ProductDetailsDto>>> GetProductDetailsAsync(Guid categoryId);
 }
