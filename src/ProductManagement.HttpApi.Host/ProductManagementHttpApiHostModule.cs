@@ -236,8 +236,8 @@ public class ProductManagementHttpApiHostModule : AbpModule
             options.EndpointLimits.Add("/api/product/delete", 1); // Most restrictive for delete
 
             // Uncomment to use Redis for distributed rate limiting
-            // options.UseRedis = true;
-            // options.RedisConnectionString = "localhost:6379";
+             options.UseRedis = true;
+            options.RedisConnectionString = "localhost:6379";
         });
     }
 

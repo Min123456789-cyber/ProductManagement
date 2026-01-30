@@ -39,7 +39,7 @@ public class CategoryAppService : ApplicationService, ICategoryAppService
     }
 
     [Authorize]
-    public async Task<ResponseDataDto<object>> CreateAsync(CreateUpdateCategoryDto input)
+    public async Task<ResponseDataDto<CategoryResponseDto>> CreateAsync(CreateUpdateCategoryDto input)
     {
         try
         {

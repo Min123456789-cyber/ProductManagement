@@ -27,9 +27,10 @@ using Volo.Abp.Application.Dtos;
 using Volo.Abp.Application.Services;
 using Volo.Abp.Domain.Repositories;
 using Volo.Abp.EventBus.Local;
+using ProductManagement.Dtos;
 
 namespace ProductManagement.AppServices.Products;
-[Authorize]
+//[Authorize]
 public class ProductAppService : ApplicationService, IProductAppService
 {
     private readonly IRepository<Product, Guid> _productRepository;
@@ -81,8 +82,6 @@ public class ProductAppService : ApplicationService, IProductAppService
     /// <param name="input">The product creation data including optional image file.</param>
     /// <returns>A response containing the created product details.</returns>
     /// <exception cref="UserFriendlyException">Thrown when product creation fails.</exception>
-    public async Task<ResponseDataDto<object>> CreateAsync([FromForm] CreateUpdateProductDto input)
-    [Authorize(ProductManagementPermissions.Category.Create)] // Why are you using category permission on product.
     public async Task<ResponseDataDto<object>> CreateAsync(CreateUpdateProductDto input)
     {
         try
@@ -141,8 +140,7 @@ public class ProductAppService : ApplicationService, IProductAppService
         }
     }
 
-    [Authorize(ProductManagementPermissions.Category.Edit)]
-    public async Task<ResponseDataDto<object>> UpdateAsync(Guid id, CreateUpdateProductDto input)
+    //[Authorize(ProductManagementPermissions.Category.Edit)]
     /// <summary>
     /// Updates an existing product with new information and optional image.
     /// </summary>
@@ -217,8 +215,7 @@ public class ProductAppService : ApplicationService, IProductAppService
     /// <param name="id">The ID of the product to delete.</param>
     /// <returns>A response indicating the success of the deletion operation.</returns>
     /// <exception cref="UserFriendlyException">Thrown when product deletion fails.</exception>
-    public async Task<ResponseDataDto<object>> DeleteAsync([Required(ErrorMessage = "Id is required.")] Guid id)
-    [Authorize(ProductManagementPermissions.Category.Delete)]
+    //[Authorize(ProductManagementPermissions.Category.Delete)]
     public async Task<ResponseDataDto<object>> DeleteAsync(Guid id)
     {
         try
@@ -260,9 +257,8 @@ public class ProductAppService : ApplicationService, IProductAppService
     /// <param name="id">The ID of the product to retrieve.</param>
     /// <returns>A response containing the product details.</returns>
     /// <exception cref="UserFriendlyException">Thrown when product retrieval fails.</exception>
-    public async Task<ResponseDataDto<ProductDto>> GetAsync([Required(ErrorMessage = "Id is required.")] Guid id)
-    [Authorize(ProductManagementPermissions.Category.Default)]
-    public async Task<ResponseDataDto<object>> GetAsync(Guid id)
+    //[Authorize(ProductManagementPermissions.Category.Default)]
+    public async Task<ResponseDataDto<ProductDto>> GetAsync(Guid id)
     {
         try
         {
@@ -320,7 +316,7 @@ public class ProductAppService : ApplicationService, IProductAppService
     /// <returns>A response containing the paginated list of products.</returns>
     /// <exception cref="UserFriendlyException">Thrown when product list retrieval fails.</exception>
     //[Authorize(ProductManagementPermissions.Category.Default)]
-    [Authorize(CustomAuthentication.ApiKeyOrBearerTokenPolicy)]
+    //[Authorize(CustomAuthentication.ApiKeyOrBearerTokenPolicy)]
     public async Task<ResponseDataDto<PagedResultDto<ProductDto>>> GetListAsync(PagedAndSortedResultRequestDto input, ProductFilter filter)
     {
         try
@@ -559,6 +555,105 @@ public class ProductAppService : ApplicationService, IProductAppService
         {
             _logger.LogError(ex, "Failed to clear product cache. Error: {ErrorMessage}", ex.Message);
             throw new UserFriendlyException("An error occurred while clearing the product cache.", "500");
+        }
+    }
+
+    /// <summary>
+    /// Retrieves detailed information for a specific product.
+    /// </summary>
+    /// <param name="ProductId">The ID of the product to retrieve details for.</param>
+    /// <returns>A response containing the product details.</returns>
+    /// <exception cref="UserFriendlyException">Thrown when product detail retrieval fails.</exception>
+    public async Task<ResponseDataDto<ProductDetailsDto>> GetProductDetailAsync(Guid ProductId)
+    {
+        try
+        {
+            _logger.LogInformation("Starting product detail retrieval process for ID: {ProductId}", ProductId);
+
+            var products = await _productRepository.GetQueryableAsync();
+            var categories = await _categoryRepository.GetQueryableAsync();
+
+            var result = await (from p in products
+                                join c in categories on p.CategoryId equals c.Id
+                                where p.Id == ProductId
+                                select new ProductDetailsDto
+                                {
+                                    ProductName = p.Name,
+                                    CategoryName = c.Name
+                                }).FirstOrDefaultAsync();
+
+            if (result == null)
+            {
+                _logger.LogWarning("Product not found with ID: {ProductId}", ProductId);
+                throw new UserFriendlyException("Product not found.");
+            }
+
+            _logger.LogInformation("Product detail retrieved successfully for ID: {ProductId}", ProductId);
+
+            return new ResponseDataDto<ProductDetailsDto>
+            {
+                Success = true,
+                Code = 200,
+                Message = "Product detail retrieved successfully.",
+                Data = result
+            };
+        }
+        catch (UserFriendlyException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve product detail for ID {ProductId}. Error: {ErrorMessage}",
+                ProductId, ex.Message);
+            throw new UserFriendlyException("An error occurred while retrieving the product detail.", "500");
+        }
+    }
+
+    /// <summary>
+    /// Retrieves detailed information for all products in a specific category.
+    /// </summary>
+    /// <param name="categoryId">The ID of the category to retrieve product details for.</param>
+    /// <returns>A response containing the list of product details.</returns>
+    /// <exception cref="UserFriendlyException">Thrown when product details retrieval fails.</exception>
+    public async Task<ResponseDataDto<List<ProductDetailsDto>>> GetProductDetailsAsync(Guid categoryId)
+    {
+        try
+        {
+            _logger.LogInformation("Starting product details retrieval process for category ID: {CategoryId}", categoryId);
+
+            var products = await _productRepository.GetQueryableAsync();
+            var categories = await _categoryRepository.GetQueryableAsync();
+
+            var result = await (from p in products
+                                join c in categories on p.CategoryId equals c.Id
+                                where p.CategoryId == categoryId
+                                select new ProductDetailsDto
+                                {
+                                    ProductName = p.Name,
+                                    CategoryName = c.Name
+                                }).ToListAsync();
+
+            _logger.LogInformation("Retrieved {Count} product details for category ID: {CategoryId}",
+                result.Count, categoryId);
+
+            return new ResponseDataDto<List<ProductDetailsDto>>
+            {
+                Success = true,
+                Code = 200,
+                Message = "Product details retrieved successfully.",
+                Data = result
+            };
+        }
+        catch (UserFriendlyException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to retrieve product details for category ID {CategoryId}. Error: {ErrorMessage}",
+                categoryId, ex.Message);
+            throw new UserFriendlyException("An error occurred while retrieving the product details.", "500");
         }
     }
 

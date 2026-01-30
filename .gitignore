@@ -261,5 +261,4 @@ src/ProductManagement.DbMigrator/Logs/*
 src/ProductManagement.Blazor.Server/Logs/*
 src/ProductManagement.Blazor.Server.Tiered/Logs/*
 
-# Use abp install-libs to restore.
-**/wwwroot/libs/*
+
