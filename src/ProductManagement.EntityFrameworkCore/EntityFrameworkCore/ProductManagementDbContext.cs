@@ -3,11 +3,13 @@ using ProductManagement.Entities.Category;
 using ProductManagement.Entities.Departments;
 using ProductManagement.Entities.Products;
 using ProductManagement.Entities.Teachers;
+using System.Reflection.Emit;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
 using Volo.Abp.Data;
 using Volo.Abp.DependencyInjection;
 using Volo.Abp.EntityFrameworkCore;
+using Volo.Abp.EntityFrameworkCore.Modeling;
 using Volo.Abp.FeatureManagement.EntityFrameworkCore;
 using Volo.Abp.Identity;
 using Volo.Abp.Identity.EntityFrameworkCore;
@@ -16,6 +18,7 @@ using Volo.Abp.PermissionManagement.EntityFrameworkCore;
 using Volo.Abp.SettingManagement.EntityFrameworkCore;
 using Volo.Abp.TenantManagement;
 using Volo.Abp.TenantManagement.EntityFrameworkCore;
+using Volo.Abp.Users.EntityFrameworkCore;
 
 namespace ProductManagement.EntityFrameworkCore;
 
@@ -127,6 +130,21 @@ public class ProductManagementDbContext :
             entity.ToTable("Departments");
             entity.HasKey(p => p.Id);
             entity.Property(p => p.Name).IsRequired(true).HasMaxLength(100);
+        });
+
+        builder.Entity<IdentityUser>(b =>
+        {
+            b.ToTable(AbpIdentityDbProperties.DbTablePrefix + "Users", AbpIdentityDbProperties.DbSchema);
+
+            b.ConfigureByConvention();
+            b.ConfigureAbpUser();
+
+            b.HasIndex(u => new { u.TenantId, u.NormalizedUserName }).IsUnique().HasFilter("\"IsDeleted\" = 'false'");
+            b.HasIndex(u => new { u.TenantId, u.NormalizedEmail }).IsUnique().HasFilter("\"IsDeleted\" = 'false'");
+            b.HasIndex(u => new { u.TenantId, u.UserName }).IsUnique().HasFilter("\"IsDeleted\" = 'false'");
+            b.HasIndex(u => new { u.TenantId, u.Email }).IsUnique().HasFilter("\"IsDeleted\" = 'false'");
+
+            b.ApplyObjectExtensionMappings();
         });
     }
 }
